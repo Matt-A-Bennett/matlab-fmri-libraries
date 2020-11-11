@@ -43,25 +43,35 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     X = nan(map_size);
     Y = nan(map_size);
     sigma = nan(map_size);
-    r_squared = nan(map_size);
+    grid_size = sqrt(size(models.models,2));
+    % r_squared = nan(map_size);
 
     roi = find(mask(:));
+
+    % find best model fitting the fits
+    progress_incr = 10;
     for idx = 1:length(roi)
+        percent = idx/length(roi);
+        if percent >= progress_incr/100
+            fprintf('%s%% done...\n', num2str(round(percent*100)));
+            progress_incr = progress_incr + 10;
+        end
         vox = roi(idx);
         [x,y,z] = ind2sub(map_size,vox);
         fits = corr(double(squeeze(functional(x,y,z,:))), models.models);
         [r, i] = max(fits);
-        best_model = models.params(i,:);
-        X(vox) = best_model(1);
-        Y(vox) = best_model(2);
-        sigma(vox) = best_model(3);
-        r_squared(vox) = r*r;
+        to_fit = reshape(fits, grid_size, grid_size);
+        % out = [Amp, x_coord, x_sigma, y_coord, y_sigma, gauss_rotation]
+        out = Fit2dGaussian(to_fit);
+        X(vox) = out(2);
+        Y(vox) = out(4);
+        sigma(vox) = mean([out(3), out(5)]);
     end
 
     fitted_models.X = X;
     fitted_models.Y = Y;
     fitted_models.sigma = sigma;
-    fitted_models.r_squared = r_squared;
+    % fitted_models.r_squared = r_squared;
 
     %% how can we improve the fits?
     % fit_mat = nan(270);
@@ -72,5 +82,17 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     % fit_mat = nanconv(fit_mat, gauss);
     % figure, surf(fit_mat),% axis image
 
-
+    % % old approach
+    % % find best model
+    % for idx = 1:length(roi)
+    %     vox = roi(idx);
+    %     [x,y,z] = ind2sub(map_size,vox);
+    %     fits = corr(double(squeeze(functional(x,y,z,:))), models.models);
+    %     [r, i] = max(fits);
+    %     best_model = models.params(i,:);
+    %     X(vox) = best_model(1);
+    %     Y(vox) = best_model(2);
+    %     sigma(vox) = best_model(3);
+    %     r_squared(vox) = r*r;
+    % end
 

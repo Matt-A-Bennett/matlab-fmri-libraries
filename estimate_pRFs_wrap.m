@@ -12,10 +12,10 @@ func_names = {'sub-01_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 'sub-01_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
 
 stat_map_name = 'tstat1.nii.gz';
-pa_map_outname = 'pa_from_pRF_paecc_bars_bars';
-ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars';
-prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars';
-rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars';
+pa_map_outname = 'pa_from_pRF_paecc_bars_bars_new';
+ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_new';
+prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_new';
+% rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
@@ -28,23 +28,23 @@ screen_distance_cm = 200;
 down_sample_model_space = screen_height_pix/4;
 
 % number of pixels (in downsized space) bewteen neighbouring pRF models
-grid_density = 5;
+grid_density = 10;
 
 % sigmas in visual degrees to try as models
 % I think we need a logarithmic scaling here...
 % sigmas = [0.05 : 0.05 : 0.8];
 % sigmas = [0.8:0.1:2];
-sigmas = [4, 8, 12];
+% sigmas = [4, 8, 12];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
     1000/(((16*20000)-450)/1044),...
     1000/(((16*20000)-450)/1044)];
 
-%% start
-pixperVA = pixperVisAng(screen_height_pix, screen_height_cm, screen_distance_cm);
-r_pixperVA = pixperVA/(screen_height_pix/down_sample_model_space);
-sigmas = sigmas * r_pixperVA;
+% %% start
+% pixperVA = pixperVisAng(screen_height_pix, screen_height_cm, screen_distance_cm);
+% r_pixperVA = pixperVA/(screen_height_pix/down_sample_model_space);
+% sigmas = sigmas * r_pixperVA;
 
 nruns = size(func_names,1);
 multi_func_ni = [];
@@ -79,7 +79,9 @@ for run_idx = 1:nruns
     stimMasks = retstim2mask(image_dir, retstim2mask_params);
 
     % create model timecourse and pad to make the baseline
-    models = makePRFmodels(stimMasks, grid_density, sigmas);
+    % models = makePRFmodels(stimMasks, grid_density, sigmas);
+    models.models = stimMasks(:,1:grid_density:end, 1:grid_density:end);
+    models.models = reshape(models.models, size(models.models,1), [])';
     pad = zeros(size(models.models,1), round(12*time_step));
     models.models = [pad, models.models, pad];
 
@@ -97,7 +99,7 @@ for run_idx = 1:nruns
 
     % concaternate models so far
     combined_models.models = cat(1, combined_models.models, models.models);
-    combined_models.params = models.params;
+    % combined_models.params = models.params;
 end
 
 % for testing
@@ -125,10 +127,13 @@ fprintf('fitting pRFs...\n');
 clear fit_pRFs_params
 fit_pRFs_params.mask = mask;
 fitted_models = fit_pRFs(multi_func_ni, combined_models, fit_pRFs_params);
-
 % convert X and Y coords to polar and eccentricity coords
-[theta, rho] = cart2pol(fitted_models.X-retstim2mask_params.resize/2,...
-    fitted_models.Y-retstim2mask_params.resize/2);
+[theta, rho] = cart2pol(fitted_models.X*10, fitted_models.Y*10);
+
+% % old approach
+% % convert X and Y coords to polar and eccentricity coords
+% [theta, rho] = cart2pol(fitted_models.X-retstim2mask_params.resize/2,...
+%     fitted_models.Y-retstim2mask_params.resize/2);
 
 % convert theta into degrees (1-180 from upper to lower visual field)
 theta = rad2deg(theta)+180;
@@ -149,5 +154,5 @@ niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
 tstat_info_ni.Filename = [data_dir, prf_size_map_outname, '.nii'];
 niftiwrite(single(fitted_models.sigma), [data_dir, prf_size_map_outname], tstat_info_ni);
 % write r_squared map
-tstat_info_ni.Filename = [data_dir, rsq_map_outname, '.nii'];
-niftiwrite(single(fitted_models.r_squared), [data_dir, rsq_map_outname], tstat_info_ni);
+% tstat_info_ni.Filename = [data_dir, rsq_map_outname, '.nii'];
+% niftiwrite(single(fitted_models.r_squared), [data_dir, rsq_map_outname], tstat_info_ni);
