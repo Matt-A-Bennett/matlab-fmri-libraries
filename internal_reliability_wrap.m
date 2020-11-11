@@ -83,10 +83,10 @@ mask = niftiread(sprintf('%ssub-01_V1patch.nii', input_path));
 
 %% run reliability function
 clear internal_reliability_params
-internal_reliability_params.mask = mask; % ROI
-internal_reliability_params.pervoxel = 0; % get the ROI average reliability
-internal_reliability_params.n_conditions = 1:24; % don't care about checkboards
-reliability = internal_reliability(func, internal_reliability_params);
+% internal_reliability_params.mask = mask; % ROI
+internal_reliability_params.pervoxel = 1; % get the ROI average reliability
+internal_reliability_params.which_conditions = 1:24; % don't care about checkboards
+reliability = internal_reliability(func, 2, internal_reliability_params);
 
 if isstruct(reliability)
     %% write reliability map

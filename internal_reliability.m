@@ -102,9 +102,9 @@ function reliability = internal_reliability(func, TR, varargin)
 
     % check if we need to average the voxel timecourses
     if pervoxel
-        betas = nan(sum(lin_mask), size(func(1).dm, 2), n_runs);
+        betas = nan(sum(lin_mask), size(func(1).dm, 2)+1, n_runs);
     else
-        betas = nan(1, size(func(1).dm, 2), n_runs);
+        betas = nan(1, size(func(1).dm, 2)+1, n_runs);
     end
 
     if optimise_batchsize
@@ -235,4 +235,3 @@ function reliability = internal_reliability(func, TR, varargin)
         reliability.mean_map(lin_mask) = mean_corrs;
         reliability.std_map(lin_mask) = std_corrs;
     end
-

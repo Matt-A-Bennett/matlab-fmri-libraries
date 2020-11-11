@@ -33,7 +33,8 @@ grid_density = 5;
 % sigmas in visual degrees to try as models
 % I think we need a logarithmic scaling here...
 % sigmas = [0.05 : 0.05 : 0.8];
-sigmas = [0.8:0.1:2];
+% sigmas = [0.8:0.1:2];
+sigmas = [4, 8, 12];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
