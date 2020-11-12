@@ -43,24 +43,39 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     X = nan(map_size);
     Y = nan(map_size);
     sigma = nan(map_size);
-    grid_size = sqrt(size(models.models,2));
     % r_squared = nan(map_size);
 
     roi = find(mask(:));
 
     % find best model fitting the fits
-    progress_incr = 10;
+    progress_incr = 10; % update at N% intervals
+    progress = 0;
     for idx = 1:length(roi)
+        % display progress
         percent = idx/length(roi);
-        if percent >= progress_incr/100
+        if percent >= progress/100
             fprintf('%s%% done...\n', num2str(round(percent*100)));
-            progress_incr = progress_incr + 10;
+            progress = progress + progress_incr;
         end
+
+        % get voxel location from mask
         vox = roi(idx);
         [x,y,z] = ind2sub(map_size,vox);
-        fits = corr(double(squeeze(functional(x,y,z,:))), models.models);
-        [r, i] = max(fits);
-        to_fit = reshape(fits, grid_size, grid_size);
+
+        % populate field with model fits
+        field = nan(size(models(1).grids,1), size(models(1).grids,1));
+        for i = 1:size(models,2)
+            fits = corr(double(squeeze(functional(x,y,z,:))), models(i).models);
+            field(models(i).grids) = fits;
+        end
+
+        % interpolate over the missing values
+        [y,x] = ind2sub(size(field), find(~isnan(field(:))));
+        v = field(~isnan(field(:)));
+        [xq,yq] = meshgrid(1:size(field,1), 1:size(field,2));
+        to_fit = griddata(x,y,v,xq,yq, 'linear');
+
+        % fit a gaussian to the field map to estimate pRF location
         % out = [Amp, x_coord, x_sigma, y_coord, y_sigma, gauss_rotation]
         out = fit_gauss_2D(to_fit);
         X(vox) = out(2);
@@ -71,28 +86,4 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     fitted_models.X = X;
     fitted_models.Y = Y;
     fitted_models.sigma = sigma;
-    % fitted_models.r_squared = r_squared;
-
-    %% how can we improve the fits?
-    % fit_mat = nan(270);
-    % for idx = 386*2+1:386*3 %size(models.params,1)/3
-    % fit_mat(models.params(idx, 1), models.params(idx, 2)) = fits(idx);
-    % end
-    % gauss = fspecial('gaussian', [10, 10], 3);
-    % fit_mat = nanconv(fit_mat, gauss);
-    % figure, surf(fit_mat),% axis image
-
-    % % old approach
-    % % find best model
-    % for idx = 1:length(roi)
-    %     vox = roi(idx);
-    %     [x,y,z] = ind2sub(map_size,vox);
-    %     fits = corr(double(squeeze(functional(x,y,z,:))), models.models);
-    %     [r, i] = max(fits);
-    %     best_model = models.params(i,:);
-    %     X(vox) = best_model(1);
-    %     Y(vox) = best_model(2);
-    %     sigma(vox) = best_model(3);
-    %     r_squared(vox) = r*r;
-    % end
 

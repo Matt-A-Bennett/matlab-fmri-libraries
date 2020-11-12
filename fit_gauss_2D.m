@@ -71,11 +71,9 @@ function out = fit_gauss_2D(data)
     S = data;
     S(isnan(S))=0;
 
-    % if S has odd number of rows/cols, pad with a row/col of zeros
-    if rem(n, 2)==1
-        S = [S; zeros(1,m)];
-        S = [S, zeros(n+1,1)];
-    end
+    % it errors unless I do this...
+    S = [S; zeros(1,m)];
+    S = [S, zeros(n+1,1)];
 
     %% ---Fit---
     % Define lower and upper bounds [Amp,xo,wx,yo,wy,fi]

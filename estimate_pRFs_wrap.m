@@ -15,41 +15,33 @@ stat_map_name = 'tstat1.nii.gz';
 pa_map_outname = 'pa_from_pRF_paecc_bars_bars_new';
 ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_new';
 prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_new';
-% rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
 screen_distance_cm = 200;
 
-%% parameters
-% if we pretend the screen was lower resolution, all the computations are less
-% expensive and we don't lose much precision (it's no as if we can reliably
-% estimate the pRF location down to the pixel level)
 down_sample_model_space = screen_height_pix/4;
 
 % number of pixels (in downsized space) bewteen neighbouring pRF models
-grid_density = 10;
-
-% sigmas in visual degrees to try as models
-% I think we need a logarithmic scaling here...
-% sigmas = [0.05 : 0.05 : 0.8];
-% sigmas = [0.8:0.1:2];
-% sigmas = [4, 8, 12];
+grid_densities = [1, 5, 10, 15];
+grid_region_borders = [5, 25, 50, 135-1];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
     1000/(((16*20000)-450)/1044),...
     1000/(((16*20000)-450)/1044)];
 
-% %% start
-% pixperVA = pixperVisAng(screen_height_pix, screen_height_cm, screen_distance_cm);
-% r_pixperVA = pixperVA/(screen_height_pix/down_sample_model_space);
-% sigmas = sigmas * r_pixperVA;
+%% start
 
 nruns = size(func_names,1);
 multi_func_ni = [];
-combined_models.models = [];
+
+combined_models = struct();
+for i = 1:length(grid_densities)
+    combined_models(i).models = [];
+end
 multi_run_dm = [];
+
 identity_nruns = eye(nruns);
 nvols = zeros(nruns,1);
 for run_idx = 1:nruns
@@ -69,7 +61,9 @@ for run_idx = 1:nruns
     % check for duplicate directories to avoid doing work multiple times
     if run_idx > 1 && strcmp(image_dir, image_dirs{run_idx-1}) &&...
             nvols(run_idx) == nvols(run_idx-1)
-        combined_models.models = cat(1, combined_models.models, models.models);
+        for i = 1:length(grid_densities)
+            combined_models(i).models = cat(1, combined_models(i).models, models(i).models);
+        end
         continue
     end
 
@@ -78,28 +72,74 @@ for run_idx = 1:nruns
     retstim2mask_params.resize = down_sample_model_space;
     stimMasks = retstim2mask(image_dir, retstim2mask_params);
 
+    % retstim2mask_params.resize = down_sample_model_space;
+    % stimMasks = retstim2mask(image_dir, retstim2mask_params);
+
     % create model timecourse and pad to make the baseline
     % models = makePRFmodels(stimMasks, grid_density, sigmas);
-    models.models = stimMasks(:,1:grid_density:end, 1:grid_density:end);
-    models.models = reshape(models.models, size(models.models,1), [])';
-    pad = zeros(size(models.models,1), round(12*time_step));
-    models.models = [pad, models.models, pad];
 
-    % convolve the model timecourses with HRF function
-    clear dm_conv_params
-    dm_conv_params.time_res = 'ms';
-    dm_conv_params.time_step = time_step;
-    dm_conv = hrf_conv(models.models', dm_conv_params);
+    % make indices for regions in which to apply different grid densities
+    full_index_regions = zeros(down_sample_model_space, down_sample_model_space);
+    for grid_region_idx = 1:size(grid_region_borders,2)-1
+        index_regions = zeros(down_sample_model_space, down_sample_model_space);
+        start_idx = round(down_sample_model_space/2)-grid_region_borders(grid_region_idx);
+        stop_idx = round(down_sample_model_space/2)+grid_region_borders(grid_region_idx);
+        index_regions(start_idx:stop_idx, start_idx:stop_idx) = 1;
+        full_index_regions = full_index_regions + index_regions;
+    end
+    full_index_regions = (full_index_regions.*-1) + length(grid_densities);
 
-    % down sample dm_conv to the TR resolution
-    idxq = linspace(1, size(dm_conv,1), size(dm_conv,1)/(time_step*2));
-    dm_conv = interp1(dm_conv, idxq, 'linear');
-    dm_conv = [dm_conv; zeros(nvols(run_idx)-size(dm_conv,1), size(dm_conv,2))];
-    models.models = dm_conv;
+    % index at some density in each region and stimulus timecourse
+    models = struct();
+    % models.models = [];
+    grid_count = 0;
+    total_models = 0;
+    for grid_density = grid_densities
+        grid_count = grid_count + 1;
 
-    % concaternate models so far
-    combined_models.models = cat(1, combined_models.models, models.models);
-    % combined_models.params = models.params;
+        % create indices for the correct region
+        full_index = logical(zeros(down_sample_model_space,down_sample_model_space));
+
+        % create grid sample across whole field
+        full_index(1:grid_density:end, 1:grid_density:end) = 1;
+        models(grid_count).full_grids = full_index;
+
+        % keep only the part that is in the current region to be sampled
+        index = full_index;
+        index(full_index_regions~=grid_count) = 0;
+        models(grid_count).grids = index;
+
+        % record grid density
+        models(grid_count).grid_density = grid_density;
+
+        % extract model and pad
+        tmp_models = stimMasks(:,index)';
+        pad = zeros(size(tmp_models,1), round(12*time_step));
+        tmp_models = [pad, tmp_models, pad];
+
+        % add models and info to structure
+        models(grid_count).models = tmp_models;
+
+        % convolve the model timecourses with HRF function
+        clear dm_conv_params
+        dm_conv_params.time_res = 'ms';
+        dm_conv_params.time_step = time_step;
+        dm_conv = hrf_conv(models(grid_count).models', dm_conv_params);
+
+        % down sample dm_conv to the TR resolution
+        idxq = linspace(1, size(dm_conv,1), size(dm_conv,1)/(time_step*2));
+        dm_conv = interp1(dm_conv, idxq, 'linear');
+        dm_conv = [dm_conv; zeros(nvols(run_idx)-size(dm_conv,1), size(dm_conv,2))];
+        models(grid_count).models = dm_conv;
+
+        % concaternate models so far
+        combined_models(grid_count).models = cat(1, combined_models(grid_count).models, models(grid_count).models);
+        combined_models(grid_count).grids = index;
+        combined_models(grid_count).full_grids = full_index;
+        combined_models(grid_count).grid_density = grid_density;
+
+        total_models = total_models + size(dm_conv,1);
+    end
 end
 
 % for testing
@@ -109,6 +149,9 @@ map_size = map_size(1:3);
 mask = zeros(map_size);
 mask(:, 1:20, :) = 1;
 mask(func_mean<-20000) = 0;
+
+fprintf('number of models to fit per voxel: %d...\n', total_models);
+fprintf('number of voxels to fit: %d...\n', sum(mask(:)));
 
 % remove global run confounds using glm
 % put the data into a volumes x voxels matrix
@@ -126,14 +169,11 @@ multi_func_ni = permute(multi_func_ni, [2, 3, 4 1]);
 fprintf('fitting pRFs...\n');
 clear fit_pRFs_params
 fit_pRFs_params.mask = mask;
+tic
 fitted_models = fit_pRFs(multi_func_ni, combined_models, fit_pRFs_params);
+toc
 % convert X and Y coords to polar and eccentricity coords
 [theta, rho] = cart2pol(fitted_models.X*10, fitted_models.Y*10);
-
-% % old approach
-% % convert X and Y coords to polar and eccentricity coords
-% [theta, rho] = cart2pol(fitted_models.X-retstim2mask_params.resize/2,...
-%     fitted_models.Y-retstim2mask_params.resize/2);
 
 % convert theta into degrees (1-180 from upper to lower visual field)
 theta = rad2deg(theta)+180;
@@ -153,6 +193,3 @@ niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
 % write prf_size map
 tstat_info_ni.Filename = [data_dir, prf_size_map_outname, '.nii'];
 niftiwrite(single(fitted_models.sigma), [data_dir, prf_size_map_outname], tstat_info_ni);
-% write r_squared map
-% tstat_info_ni.Filename = [data_dir, rsq_map_outname, '.nii'];
-% niftiwrite(single(fitted_models.r_squared), [data_dir, rsq_map_outname], tstat_info_ni);
