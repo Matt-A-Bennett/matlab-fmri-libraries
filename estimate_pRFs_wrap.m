@@ -7,15 +7,21 @@ image_dirs = {'~/projects/uclouvain/jolien_proj/exported_pa_ecc/',
 
 data_dir = '~/projects/uclouvain/jolien_proj/';
 
-func_names = {'sub-01_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
-'sub-01_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
-'sub-01_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
+func_names = {'sub-30_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
+'sub-30_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
+'sub-30_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
 
-stat_map_name = 'tstat1.nii.gz';
-pa_map_outname = 'pa_from_pRF_paecc_bars_bars';
-ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars';
-prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars';
-rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars';
+% func_names = {'sub-01_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
+% 'sub-01_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
+% 'sub-01_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
+
+% stat_map_name = 'tstat1.nii.gz';
+stat_map_name = 'sub-30_fake_tstat_map_retino.nii.gz';
+
+pa_map_outname = 'pa_from_pRF_paecc_bars_bars_spatsm';
+ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_spatsm';
+prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_spatsm';
+rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars_spatsm';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
@@ -29,6 +35,8 @@ down_sample_model_space = screen_height_pix/4;
 
 % number of pixels (in downsized space) bewteen neighbouring pRF models
 grid_density = 5;
+% might mix the upper and lower visual fields for V1 (calcerine sulcus)
+do_spatial_smoothing = 1;
 
 % sigmas in visual degrees to try as models
 % I think we need a logarithmic scaling here...
@@ -59,6 +67,15 @@ for run_idx = 1:nruns
 
     % load functional data and concaternate in along time dimension
     functional_ni = niftiread(sprintf('%s%s', data_dir, func_names{run_idx}));
+
+    % spatial smoothing
+    if do_spatial_smoothing
+        for vol_idx = 1:size(functional_ni,4)
+            smoothed = smooth3(functional_ni(:,:,:,vol_idx), 'gaussian', 3);
+            functional_ni(:,:,:,vol_idx) = smoothed;
+        end
+    end
+
     multi_func_ni = cat(4, multi_func_ni, functional_ni);
     nvols(run_idx) = size(functional_ni,4);
 
