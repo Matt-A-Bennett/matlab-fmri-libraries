@@ -1,4 +1,4 @@
-function out = fit_gauss_2D(data)
+function A = fit_gauss_2D(data)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %
     %                   Fit a 2D Gaussian Function to Data
@@ -50,7 +50,13 @@ function out = fit_gauss_2D(data)
 
     %% ---Parameters---
     [m,n] = size(data); % n x m pixels area/data matrix
-    A0 = [1,0,5,0,5,0];   % Inital (guess) parameters
+
+    % % we'll use the global max as an initial guess
+    % [amp,ix] = max(data(:));
+    % [i, j] = ind2sub(size(data),ix);
+
+    % A0 = [amp,j,5,i,5,0];   % Inital (guess) parameters
+    A0 = [0.3,0,5,0.1,5,0.1];   % Inital (guess) parameters
     InterpMethod='nearest'; % 'nearest','linear','spline','cubic'
     % FitOrientation='dont';	% 'fit': fit for orientation, 'dont' fit for orientation
 
@@ -58,7 +64,7 @@ function out = fit_gauss_2D(data)
     % Numerical Grid
     [x,y]=meshgrid(-n/2:n/2,-m/2:m/2); X=zeros(m+1,n+1,2); X(:,:,1)=x; X(:,:,2)=y;
     % High Resolution Grid
-    % h=3; [xh,yh]=meshgrid(-n/2:1/h:n/2,-m/2:1/h:m/2); Xh=zeros(h*m+1,h*n+1,2); Xh(:,:,1)=xh; Xh(:,:,2)=yh;
+    h=3; [xh,yh]=meshgrid(-n/2:1/h:n/2,-m/2:1/h:m/2); Xh=zeros(h*m+1,h*n+1,2); Xh(:,:,1)=xh; Xh(:,:,2)=yh;
 
     %% ---Build Sample to be fitted---
     % Sample Parameters:
@@ -78,11 +84,12 @@ function out = fit_gauss_2D(data)
     %% ---Fit---
     % Define lower and upper bounds [Amp,xo,wx,yo,wy,fi]
     lb = [0,-n/2,0,-n/2,0,0];
-    ub = [realmax('double'),n/2,(n/2)^2,n/2,(n/2)^2,pi/4];
+    % ub = [realmax('double'),n/2,(n/2)^2,n/2,(n/2)^2,pi/4]; % orig
+    ub = [realmax('double'),n/2,n/4,n/2,n/4,pi/4];
     % Fit sample data
     % switch FitOrientation
     opts = optimset('Display','off');
-    [out,resnorm,res,flag,output] = lsqcurvefit(g,A0(1:5),X,S,lb(1:5),ub(1:5),opts);
+    [A,resnorm,res,flag,output] = lsqcurvefit(g,A0(1:5),X,S,lb(1:5),ub(1:5),opts);
     % case 'dont', [A,resnorm,res,flag,output] = lsqcurvefit(g,A0(1:5),X,S,lb(1:5),ub(1:5));
     % [A,resnorm,res,flag,output] = lsqcurvefit(f,A0,X,S,lb,ub);
     % case 'fit',  [A,resnorm,res,flag,output] = lsqcurvefit(f,A0,X,S,lb,ub);
@@ -102,30 +109,30 @@ function out = fit_gauss_2D(data)
     % Plot Sample Pixels data
     % hf2=figure(2); set(hf2,'Position',[20 20 800 800]);
     % subplot(4,4,[5,6,7,9,10,11,13,14,15]); imagesc(x(1,:),y(:,1),S);
-    % colormap('hot');
+    % % colormap('hot');
     % % Output and compare data and fitted function coefs
     % text(-n/2-5,m/2+5.0,sprintf('\t Amplitude \t X-Coord \t X-Width \t Y-Coord \t Y-Width \t Angle'),'Color','black');
-    % text(-n/2-5,m/2+6.2,sprintf('Set \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f',A_s),'Color','blue');
+    % % text(-n/2-5,m/2+6.2,sprintf('Set \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f',A_s),'Color','blue');
     % text(-n/2-5,m/2+7.4,sprintf('Fit \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f \t %1.3f',A),'Color','red');
-    % % Plot vertical and horizontal axis
+    % % % Plot vertical and horizontal axis
     % vx_h=x(1,:); vy_v=y(:,1);
-    % switch FitOrientation
-    %     case 'fit', M=-tan(A(6));
-    %         % generate points along _horizontal & _vertical axis
-    %         vy_h=M*(vx_h-A(2))+A(4); hPoints = interp2(x,y,S,vx_h,vy_h,InterpMethod);
-    %         vx_v=M*(A(4)-vy_v)+A(2); vPoints = interp2(x,y,S,vx_v,vy_v,InterpMethod);
-    %     case 'dont', A(6)=0;
-    %         % generate points along _horizontal & _vertical axis
-    %         vy_h=A(4)*ones(size(vx_h)); hPoints = interp2(x,y,S,vx_h,vy_h,InterpMethod);
-    %         vx_v=A(2)*ones(size(vy_v)); vPoints = interp2(x,y,S,vx_v,vy_v,InterpMethod);
-    % end
+    % % switch FitOrientation
+    % %     case 'fit', M=-tan(A(6));
+    % %         % generate points along _horizontal & _vertical axis
+    % %         vy_h=M*(vx_h-A(2))+A(4); hPoints = interp2(x,y,S,vx_h,vy_h,InterpMethod);
+    % %         vx_v=M*(A(4)-vy_v)+A(2); vPoints = interp2(x,y,S,vx_v,vy_v,InterpMethod);
+    % %     case 'dont', A(6)=0;
+    % %         % generate points along _horizontal & _vertical axis
+    % vy_h=A(4)*ones(size(vx_h)); hPoints = interp2(x,y,S,vx_h,vy_h,InterpMethod);
+    % vx_v=A(2)*ones(size(vy_v)); vPoints = interp2(x,y,S,vx_v,vy_v,InterpMethod);
+    % % end
     % % plot lines
     % hold on; plot(A(2),A(4),'+b',vx_h,vy_h,'.r',vx_v,vy_v,'.g'); hold off;
-    % % Plot cross sections
-    % dmin=1.1*min(S(:)); xfit=xh(1,:); hfit=A(1)*exp(-(xfit-A(2)).^2/(2*A(3)^2));
-    % dmax=1.1*max(S(:)); yfit=yh(:,1); vfit=A(1)*exp(-(yfit-A(4)).^2/(2*A(5)^2));
-    % subplot(4,4,[1,2,3]); xposh = (vx_h-A(2))/cos(A(6))+A(2);
-    % plot(xposh,hPoints,'r.',xfit,hfit,'black'); grid on; axis([-n/2,n/2,dmin,dmax]);
-    % subplot(4,4,[8,12,16]); xposv = (vy_v-A(4))/cos(A(6))+A(4);
-    % plot(vPoints,xposv,'g.',vfit,yfit,'black'); grid on; axis([dmin,dmax,-m/2,m/2]);
-    % set(gca,'YDir','reverse');
+    % % % Plot cross sections
+    % % dmin=1.1*min(S(:)); xfit=h(1,:); hfit=A(1)*exp(-(xfit-A(2)).^2/(2*A(3)^2));
+    % % dmax=1.1*max(S(:)); yfit=yh(:,1); vfit=A(1)*exp(-(yfit-A(4)).^2/(2*A(5)^2));
+    % % subplot(4,4,[1,2,3]); xposh = (vx_h-A(2))/cos(A(6))+A(2);
+    % % plot(xposh,hPoints,'r.',xfit,hfit,'black'); grid on; axis([-n/2,n/2,dmin,dmax]);
+    % % subplot(4,4,[8,12,16]); xposv = (vy_v-A(4))/cos(A(6))+A(4);
+    % % plot(vPoints,xposv,'g.',vfit,yfit,'black'); grid on; axis([dmin,dmax,-m/2,m/2]);
+    % % set(gca,'YDir','reverse');

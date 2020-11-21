@@ -92,4 +92,5 @@ function models = makePRFmodels(stimMasks, grid_density, sigmas, varargin)
     % gaussian models * stimMasks = pRF_model timecourse (before convolution)
     models.models = gaussians * stimMasks;
     models.params = model_params;
+    models.gaussians = gaussians;
 

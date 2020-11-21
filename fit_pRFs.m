@@ -15,6 +15,7 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     % default values for vars not set in varargin:
     mask = ones(size(functional)); %    logical where ones specify which voxles
     %                                   to fit
+    gaussian_models = 0;
 
     % if varagin variables have been provided, overwrite the above default
     % values with provided values
@@ -48,7 +49,7 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     roi = find(mask(:));
 
     % find best model fitting the fits
-    progress_incr = 10; % update at N% intervals
+    progress_incr = 1; % update at N% intervals
     progress = 0;
     for idx = 1:length(roi)
         % display progress
@@ -69,18 +70,46 @@ function fitted_models = fit_pRFs(functional, models, varargin)
             field(models(i).grids) = fits;
         end
 
-        % interpolate over the missing values
-        [y,x] = ind2sub(size(field), find(~isnan(field(:))));
-        v = field(~isnan(field(:)));
-        [xq,yq] = meshgrid(1:size(field,1), 1:size(field,2));
-        to_fit = griddata(x,y,v,xq,yq, 'linear');
+        if size(models,2) > 1
+            % interpolate over the missing values
+            [y,x] = ind2sub(size(field), find(~isnan(field(:))));
+            v = field(~isnan(field(:)));
+            [xq,yq] = meshgrid(1:size(field,1), 1:size(field,2));
+            to_fit = griddata(x,y,v,xq,yq, 'linear');
+        else
+            to_fit = field;
+        end
+        % keyboard
+        to_fit(isnan(to_fit))=0;
 
-        % fit a gaussian to the field map to estimate pRF location
-        % out = [Amp, x_coord, x_sigma, y_coord, y_sigma, gauss_rotation]
-        out = fit_gauss_2D(to_fit);
+        % tmp = to_fit(:)'*gaussian_models.gaussians';
+        % [r, ix] = max(tmp(:));
+
+        % figure, scatter(to_fit(:), gaussian_models.gaussians(ix,:), '.')
+        % axis([0.25 0.33 0 0.01])
+
+        % winner = gaussian_models.gaussians(ix,:);
+        % winner = reshape(winner, 270, 270);
+
+        % to_fit_smoothed = imgaussfilt(to_fit,1);
+        % [amp, ix] = max(to_fit_smoothed(:));
+        % [i, j] = ind2sub(size(to_fit_smoothed),ix);
+
+        try
+            % fit a gaussian to the field map to estimate pRF location
+            % out = [Amp, x_coord, x_sigma, y_coord, y_sigma, gauss_rotation]
+            out = fit_gauss_2D(to_fit);
+        catch
+            out = nan(1,5);
+        end
         X(vox) = out(2);
         Y(vox) = out(4);
         sigma(vox) = mean([out(3), out(5)]);
+
+        % X(vox) = gaussian_models.params(ix,1);
+        % Y(vox) = gaussian_models.params(ix,2);
+        % sigma(vox) = gaussian_models.params(ix,3);
+
     end
 
     fitted_models.X = X;

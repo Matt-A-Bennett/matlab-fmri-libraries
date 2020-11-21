@@ -12,19 +12,24 @@ func_names = {'sub-01_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 'sub-01_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
 
 stat_map_name = 'tstat1.nii.gz';
-pa_map_outname = 'pa_from_pRF_paecc_bars_bars_new';
-ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_new';
-prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_new';
+pa_map_outname = 'pa_from_pRF_paecc_bars_bars_new_grids_owngauss';
+ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_new_grids_owngauss';
+prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_new_grids_owngauss';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
 screen_distance_cm = 200;
 
 down_sample_model_space = screen_height_pix/4;
-
 % number of pixels (in downsized space) bewteen neighbouring pRF models
 grid_densities = [1, 5, 10, 15];
-grid_region_borders = [5, 25, 50, 135-1];
+grid_region_borders = [5, 25, 50, (down_sample_model_space/2)-1];
+
+% down_sample_model_space = screen_height_pix/10;
+% % number of pixels (in downsized space) bewteen neighbouring pRF models
+% grid_densities = [1];
+% grid_region_borders = [(down_sample_model_space/2)-1];
+% sigmas = [1, 2, 4];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
@@ -32,7 +37,6 @@ time_steps = [1000/(((6*42667)-450)/842),...
     1000/(((16*20000)-450)/1044)];
 
 %% start
-
 nruns = size(func_names,1);
 multi_func_ni = [];
 
@@ -72,11 +76,8 @@ for run_idx = 1:nruns
     retstim2mask_params.resize = down_sample_model_space;
     stimMasks = retstim2mask(image_dir, retstim2mask_params);
 
-    % retstim2mask_params.resize = down_sample_model_space;
-    % stimMasks = retstim2mask(image_dir, retstim2mask_params);
-
-    % create model timecourse and pad to make the baseline
-    % models = makePRFmodels(stimMasks, grid_density, sigmas);
+    % % create model timecourse and pad to make the baseline
+    gaussian_models = makePRFmodels(stimMasks, grid_densities, sigmas);
 
     % make indices for regions in which to apply different grid densities
     full_index_regions = zeros(down_sample_model_space, down_sample_model_space);
@@ -169,11 +170,16 @@ multi_func_ni = permute(multi_func_ni, [2, 3, 4 1]);
 fprintf('fitting pRFs...\n');
 clear fit_pRFs_params
 fit_pRFs_params.mask = mask;
+% fit_pRFs_params.gaussian_models = gaussian_models;
 tic
 fitted_models = fit_pRFs(multi_func_ni, combined_models, fit_pRFs_params);
 toc
+
+% fitted_models.X = fitted_models.X - 54;
+% fitted_models.Y = fitted_models.Y - 54;
+
 % convert X and Y coords to polar and eccentricity coords
-[theta, rho] = cart2pol(fitted_models.X*10, fitted_models.Y*10);
+[theta, rho] = cart2pol(fitted_models.X, fitted_models.Y);
 
 % convert theta into degrees (1-180 from upper to lower visual field)
 theta = rad2deg(theta)+180;
@@ -193,3 +199,4 @@ niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
 % write prf_size map
 tstat_info_ni.Filename = [data_dir, prf_size_map_outname, '.nii'];
 niftiwrite(single(fitted_models.sigma), [data_dir, prf_size_map_outname], tstat_info_ni);
+
