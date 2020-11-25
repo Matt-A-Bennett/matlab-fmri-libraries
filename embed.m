@@ -16,9 +16,8 @@ function embedded = embed(background, foreground, postition, varargin)
     % position : a vector specifying the row and column of <background> where
     % the center of the <foreground> matrix will be placed. In the case that
     % <foreground> has an even number of rows/columns (so there is no true
-    % centre coord) the row and/or column of <foreground> the center coord will
-    % be taken to be one row above and/or one column left of the theortical
-    % center.
+    % centre coord) the row and/or column of <foreground> will be taken to be
+    % one row above and/or one column left of the theortical center.
     %
     % Example:
     % for the <foreground> described by the numbers below, the 'center'
