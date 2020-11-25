@@ -19,7 +19,7 @@ function embedded = embed(background, foreground, postition, varargin)
     % centre coord) the row and/or column of <foreground> the center coord will
     % be taken to be one row above and/or one column left of the theortical
     % center.
-
+    %
     % Example:
     % for the <foreground> described by the numbers below, the 'center'
     % would be 'cell 2', as it's in the true center columnwise, but the
