@@ -1,5 +1,4 @@
 addpath '/home/mattb/code/matlab/matlab'
-
 image_dirs = {'~/projects/uclouvain/jolien_proj/exported_pa_ecc/',
 '~/projects/uclouvain/jolien_proj/exported_bars/',
 '~/projects/uclouvain/jolien_proj/exported_bars/'};
@@ -17,10 +16,10 @@ func_names = {'sub-30_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 % stat_map_name = 'tstat1.nii.gz';
 stat_map_name = 'sub-30_fake_tstat_map_retino.nii.gz';
 
-pa_map_outname = 'pa_from_pRF_paecc_bars_bars_spatsm';
-ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_spatsm';
-prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_spatsm';
-rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars_spatsm';
+pa_map_outname = 'pa_from_pRF_paecc_bars_bars_spatsm_tmp';
+ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_spatsm_tmp';
+prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_spatsm_tmp';
+rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars_spatsm_tmp';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
@@ -115,43 +114,41 @@ for run_idx = 1:nruns
     combined_models.models = cat(1, combined_models.models, models.models);
     combined_models.params = models.params;
 end
->>>>>>> 0ea5f72fc144baa1ee5af9f4638e4c9076456e94
 
-% for testing
-func_mean = squeeze(mean(functional_ni,4));
-map_size = size(functional_ni);
-map_size = map_size(1:3);
-mask = zeros(map_size);
-<<<<<<< HEAD
-mask(:, 1:18, :) = 1;
-mask(func_mean<-20000) = 0;
+% % for testing
+% func_mean = squeeze(mean(functional_ni,4));
+% map_size = size(functional_ni);
+% map_size = map_size(1:3);
+% mask = zeros(map_size);
+% mask(:, 1:18, :) = 1;
+% mask(func_mean<-20000) = 0;
 
-fit_pRFs_params.mask = mask;
-fitted_models = fit_pRFs(functional_ni, models, fit_pRFs_params)
+% fit_pRFs_params.mask = mask;
+% fitted_models = fit_pRFs(functional_ni, models, fit_pRFs_params)
 
-% convert X and Y coords to polar and eccentricity coords
-[theta, rho] = cart2pol(fitted_models.X, fitted_models.Y);
+% % convert X and Y coords to polar and eccentricity coords
+% [theta, rho] = cart2pol(fitted_models.X, fitted_models.Y);
 
-%% write to nifti
-% load map info
-tstat_info_ni = niftiinfo(sprintf('%s%s', data_dir, stat_name));
+% %% write to nifti
+% % load map info
+% tstat_info_ni = niftiinfo(sprintf('%s%s', data_dir, stat_name));
 
-% change name and
-tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
-niftiwrite(single(theta), [data_dir, pa_map_outname], tstat_info_ni);
+% % change name and
+% tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
+% niftiwrite(single(theta), [data_dir, pa_map_outname], tstat_info_ni);
 
-tstat_info_ni.Filename = [data_dir, ecc_map_outname, '.nii'];
-niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
+% tstat_info_ni.Filename = [data_dir, ecc_map_outname, '.nii'];
+% niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
 
-figure
-for im_slice = 1:30
-    subplot(5,6,im_slice)
-    % imagesc(rot90(squeeze(func_mean(:, im_slice, :)))), axis image, colormap gray
-    % imagesc(rot90(squeeze(fitted_models.Y(:, im_slice, :)))), axis image
-    % imagesc(rot90(squeeze(rho(:, im_slice, :)))), axis image, caxis([min(rho(:)), max(rho(:))])
-    imagesc(rot90(squeeze(theta(:, im_slice, :)))), axis image, caxis([min(theta(:)), max(theta(:))])
-    % imagesc(rot90(squeeze(mask(:, im_slice, :)))), axis image, colormap gray
-end
+% figure
+% for im_slice = 1:30
+%     subplot(5,6,im_slice)
+%     % imagesc(rot90(squeeze(func_mean(:, im_slice, :)))), axis image, colormap gray
+%     % imagesc(rot90(squeeze(fitted_models.Y(:, im_slice, :)))), axis image
+%     % imagesc(rot90(squeeze(rho(:, im_slice, :)))), axis image, caxis([min(rho(:)), max(rho(:))])
+%     imagesc(rot90(squeeze(theta(:, im_slice, :)))), axis image, caxis([min(theta(:)), max(theta(:))])
+%     % imagesc(rot90(squeeze(mask(:, im_slice, :)))), axis image, colormap gray
+% end
 
 mask(:, 1:20, :) = 1;
 mask(func_mean<-20000) = 0;

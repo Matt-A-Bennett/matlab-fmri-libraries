@@ -3,7 +3,7 @@ function mask = circmask(matSize, radius, varargin)
     % Returns a 2D logical matrix with ones confined to a circle of specified
     % radius. The origin of the circle is in the centre of the matrix unless
     % the <location> is supplied in varargin
-
+    %
     % mandory arguments
     % matSize : vector containing number of rows / cols, respectively
     % radius :  radius of the circle in the returned matrix (must be at least

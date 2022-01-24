@@ -44,7 +44,7 @@ function embedded = embed(background, foreground, postition, varargin)
     % embedded = embed(background, foreground, position, embed_params);
 
     %% set default values for optional variables
-    % clip = 1;
+    clip = 1;
 
     %% override optional arguments
     % if varagin variables have been provided, overwrite the above default
@@ -73,7 +73,7 @@ function embedded = embed(background, foreground, postition, varargin)
     end
 
     %% start the actual fuction
-    fg_size = size(foreground)
+    fg_size = size(foreground);
 
     % compute embedded coordinates
     r1 = postition(1)-ceil(fg_size(1)/2)+1;
@@ -125,3 +125,4 @@ function embedded = embed(background, foreground, postition, varargin)
     end
 
     background(r1:r2, c1:c2) = foreground;
+    embedded = background;
