@@ -5,13 +5,11 @@ image_dirs = {'~/projects/uclouvain/jolien_proj/exported_pa_ecc/',
 
 data_dir = '~/projects/uclouvain/jolien_proj/';
 
-func_names = {'sub-30_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
-'sub-30_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
-'sub-30_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
+func_names = {'_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
+'_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
+'_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
 
-% func_names = {'sub-01_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
-% 'sub-01_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
-% 'sub-01_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
+subs = ['30']
 
 % stat_map_name = 'tstat1.nii.gz';
 stat_map_name = 'sub-30_fake_tstat_map_retino.nii.gz';
@@ -58,62 +56,67 @@ combined_models.models = [];
 multi_run_dm = [];
 identity_nruns = eye(nruns);
 nvols = zeros(nruns,1);
-for run_idx = 1:nruns
-    fprintf('processing run %d...\n', run_idx);
-    time_step = time_steps(run_idx);
-    image_dir = image_dirs{run_idx};
+for sub_idx = 1:nsubs
+    sub = subs[sub_idx]
+    sub_data_dir = sprintf('%ssub-%s/', data_dir, sub)
+    for run_idx = 1:nruns
+        fprintf('processing run %d...\n', run_idx);
+        time_step = time_steps(run_idx);
+        image_dir = image_dirs{run_idx};
 
-    % load functional data and concaternate in along time dimension
-    functional_ni = niftiread(sprintf('%s%s', data_dir, func_names{run_idx}));
+        % load functional data and concaternate in along time dimension
+        functional_ni = niftiread(sprintf('%s%s', sub_data_dir, func_names{run_idx}));
 
-    % spatial smoothing
-    if do_spatial_smoothing
-        for vol_idx = 1:size(functional_ni,4)
-            smoothed = smooth3(functional_ni(:,:,:,vol_idx), 'gaussian', 3);
-            functional_ni(:,:,:,vol_idx) = smoothed;
+        % spatial smoothing
+        if do_spatial_smoothing
+            for vol_idx = 1:size(functional_ni,4)
+                smoothed = smooth3(functional_ni(:,:,:,vol_idx), 'gaussian', 3);
+                functional_ni(:,:,:,vol_idx) = smoothed;
+            end
         end
-    end
 
-    multi_func_ni = cat(4, multi_func_ni, functional_ni);
-    nvols(run_idx) = size(functional_ni,4);
+        multi_func_ni = cat(4, multi_func_ni, functional_ni);
+        nvols(run_idx) = size(functional_ni,4);
 
-    % build up the global run confounds design matrix
-    multi_run_dm = [multi_run_dm;...
-        kron(identity_nruns(run_idx,:), ones(nvols(run_idx,1),1))];
+        % build up the global run confounds design matrix
+        multi_run_dm = [multi_run_dm;...
+            kron(identity_nruns(run_idx,:), ones(nvols(run_idx,1),1))];
 
-    % check for duplicate directories to avoid doing work multiple times
-    if run_idx > 1 && strcmp(image_dir, image_dirs{run_idx-1}) &&...
-            nvols(run_idx) == nvols(run_idx-1)
+        % check for duplicate directories to avoid doing work multiple times
+        if run_idx > 1 && strcmp(image_dir, image_dirs{run_idx-1}) &&...
+                nvols(run_idx) == nvols(run_idx-1)
+            combined_models.models = cat(1, combined_models.models, models.models);
+            continue
+        end
+
+        % convert the .png screenshots to a 3D binary mask matrix
+        clear retstim2mask_params
+        retstim2mask_params.resize = down_sample_model_space;
+        stimMasks = retstim2mask(image_dir, retstim2mask_params);
+
+        % create model timecourse and pad to make the baseline
+        models = makePRFmodels(stimMasks, grid_density, sigmas);
+        pad = zeros(size(models.models,1), round(12*time_step));
+        models.models = [pad, models.models, pad];
+
+        % convolve the model timecourses with HRF function
+        clear dm_conv_params
+        dm_conv_params.time_res = 'ms';
+        dm_conv_params.time_step = time_step;
+        dm_conv = hrf_conv(models.models', dm_conv_params);
+
+        % down sample dm_conv to the TR resolution
+        idxq = linspace(1, size(dm_conv,1), size(dm_conv,1)/(time_step*2));
+        dm_conv = interp1(dm_conv, idxq, 'linear');
+        dm_conv = [dm_conv; zeros(nvols(run_idx)-size(dm_conv,1), size(dm_conv,2))];
+        models.models = dm_conv;
+
+        % concaternate models so far
         combined_models.models = cat(1, combined_models.models, models.models);
-        continue
+        combined_models.params = models.params;
     end
-
-    % convert the .png screenshots to a 3D binary mask matrix
-    clear retstim2mask_params
-    retstim2mask_params.resize = down_sample_model_space;
-    stimMasks = retstim2mask(image_dir, retstim2mask_params);
-
-    % create model timecourse and pad to make the baseline
-    models = makePRFmodels(stimMasks, grid_density, sigmas);
-    pad = zeros(size(models.models,1), round(12*time_step));
-    models.models = [pad, models.models, pad];
-
-    % convolve the model timecourses with HRF function
-    clear dm_conv_params
-    dm_conv_params.time_res = 'ms';
-    dm_conv_params.time_step = time_step;
-    dm_conv = hrf_conv(models.models', dm_conv_params);
-
-    % down sample dm_conv to the TR resolution
-    idxq = linspace(1, size(dm_conv,1), size(dm_conv,1)/(time_step*2));
-    dm_conv = interp1(dm_conv, idxq, 'linear');
-    dm_conv = [dm_conv; zeros(nvols(run_idx)-size(dm_conv,1), size(dm_conv,2))];
-    models.models = dm_conv;
-
-    % concaternate models so far
-    combined_models.models = cat(1, combined_models.models, models.models);
-    combined_models.params = models.params;
 end
+
 
 % % for testing
 % func_mean = squeeze(mean(functional_ni,4));
@@ -182,7 +185,7 @@ theta = changem(round(theta), [91:180, fliplr(1:180), 1:90], [1:360]);
 fprintf('writing nifti maps...\n');
 %% write to nifti
 % load map info as template
-tstat_info_ni = niftiinfo(sprintf('%s%s', data_dir, stat_map_name));
+tstat_info_ni = niftiinfo(sprintf('%s%s%s', data_dir, sub, stat_map_name));
 tstat_info_ni.ImageSize = map_size;
 % write polar angle map
 tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
