@@ -5,6 +5,8 @@ image_dirs = {'~/projects/uclouvain/jolien_proj/exported_pa_ecc/',
 
 data_dir = '~/projects/uclouvain/jolien_proj/';
 
+out_dir = '/home/umutc/Music/analysis-eva/';
+
 func_names = {'_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 '_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
 '_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
@@ -12,7 +14,7 @@ func_names = {'_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 subs = ['30']
 
 % stat_map_name = 'tstat1.nii.gz';
-stat_map_name = 'sub-30_fake_tstat_map_retino.nii.gz';
+stat_map_name = '_fake_tstat_map_retino.nii.gz';
 
 pa_map_outname = 'pa_from_pRF_paecc_bars_bars_spatsm_tmp';
 ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_spatsm_tmp';
@@ -59,6 +61,7 @@ nvols = zeros(nruns,1);
 for sub_idx = 1:nsubs
     sub = subs[sub_idx]
     sub_data_dir = sprintf('%ssub-%s/', data_dir, sub)
+    sub_out_dir = sprintf('%ssub-%s/', out_dir, sub)
     for run_idx = 1:nruns
         fprintf('processing run %d...\n', run_idx);
         time_step = time_steps(run_idx);
@@ -115,87 +118,87 @@ for sub_idx = 1:nsubs
         combined_models.models = cat(1, combined_models.models, models.models);
         combined_models.params = models.params;
     end
+
+
+    % % for testing
+    % func_mean = squeeze(mean(functional_ni,4));
+    % map_size = size(functional_ni);
+    % map_size = map_size(1:3);
+    % mask = zeros(map_size);
+    % mask(:, 1:18, :) = 1;
+    % mask(func_mean<-20000) = 0;
+
+    % fit_pRFs_params.mask = mask;
+    % fitted_models = fit_pRFs(functional_ni, models, fit_pRFs_params)
+
+    % % convert X and Y coords to polar and eccentricity coords
+    % [theta, rho] = cart2pol(fitted_models.X, fitted_models.Y);
+
+    % %% write to nifti
+    % % load map info
+    % tstat_info_ni = niftiinfo(sprintf('%s%s', data_dir, stat_name));
+
+    % % change name and
+    % tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
+    % niftiwrite(single(theta), [data_dir, pa_map_outname], tstat_info_ni);
+
+    % tstat_info_ni.Filename = [data_dir, ecc_map_outname, '.nii'];
+    % niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
+
+    % figure
+    % for im_slice = 1:30
+    %     subplot(5,6,im_slice)
+    %     % imagesc(rot90(squeeze(func_mean(:, im_slice, :)))), axis image, colormap gray
+    %     % imagesc(rot90(squeeze(fitted_models.Y(:, im_slice, :)))), axis image
+    %     % imagesc(rot90(squeeze(rho(:, im_slice, :)))), axis image, caxis([min(rho(:)), max(rho(:))])
+    %     imagesc(rot90(squeeze(theta(:, im_slice, :)))), axis image, caxis([min(theta(:)), max(theta(:))])
+    %     % imagesc(rot90(squeeze(mask(:, im_slice, :)))), axis image, colormap gray
+    % end
+
+    mask(:, 1:20, :) = 1;
+    mask(func_mean<-20000) = 0;
+
+    % remove global run confounds using glm
+    % put the data into a volumes x voxels matrix
+    multi_func_ni = permute(multi_func_ni, [4, 1, 2 3]);
+    multi_func_ni = reshape(multi_func_ni, size(multi_func_ni,1), []);
+    % estimate the voxel run means, make the model, subract it off
+    run_counfounds = multi_run_dm \ double(multi_func_ni);
+    confound_model = multi_run_dm * run_counfounds;
+    resid = double(multi_func_ni) - confound_model;
+    % put the data back into it's original 4D shape
+    multi_func_ni = reshape(resid, [sum(nvols), map_size]);
+    multi_func_ni = permute(multi_func_ni, [2, 3, 4 1]);
+
+    %% fit models
+    fprintf('fitting pRFs...\n');
+    clear fit_pRFs_params
+    fit_pRFs_params.mask = mask;
+    fitted_models = fit_pRFs(multi_func_ni, combined_models, fit_pRFs_params);
+
+    % convert X and Y coords to polar and eccentricity coords
+    [theta, rho] = cart2pol(fitted_models.X-retstim2mask_params.resize/2,...
+        fitted_models.Y-retstim2mask_params.resize/2);
+
+    % convert theta into degrees (1-180 from upper to lower visual field)
+    theta = rad2deg(theta)+180;
+    theta = changem(round(theta), [91:180, fliplr(1:180), 1:90], [1:360]);
+
+    fprintf('writing nifti maps...\n');
+    %% write to nifti
+    % load map info as template
+    tstat_info_ni = niftiinfo(sprintf('%ssub-%s%s', out_dir, sub, stat_map_name));
+    tstat_info_ni.ImageSize = map_size;
+    % write polar angle map
+    tstat_info_ni.Filename = [out_dir, pa_map_outname, '.nii'];
+    niftiwrite(single(theta), [out_dir, pa_map_outname], tstat_info_ni);
+    % write eccentricity map
+    tstat_info_ni.Filename = [out_dir, ecc_map_outname, '.nii'];
+    niftiwrite(single(rho), [out_dir, ecc_map_outname], tstat_info_ni);
+    % write prf_size map
+    tstat_info_ni.Filename = [out_dir, prf_size_map_outname, '.nii'];
+    niftiwrite(single(fitted_models.sigma), [out_dir, prf_size_map_outname], tstat_info_ni);
+    % write r_squared map
+    tstat_info_ni.Filename = [out_dir, rsq_map_outname, '.nii'];
+    niftiwrite(single(fitted_models.r_squared), [out_dir, rsq_map_outname], tstat_info_ni);
 end
-
-
-% % for testing
-% func_mean = squeeze(mean(functional_ni,4));
-% map_size = size(functional_ni);
-% map_size = map_size(1:3);
-% mask = zeros(map_size);
-% mask(:, 1:18, :) = 1;
-% mask(func_mean<-20000) = 0;
-
-% fit_pRFs_params.mask = mask;
-% fitted_models = fit_pRFs(functional_ni, models, fit_pRFs_params)
-
-% % convert X and Y coords to polar and eccentricity coords
-% [theta, rho] = cart2pol(fitted_models.X, fitted_models.Y);
-
-% %% write to nifti
-% % load map info
-% tstat_info_ni = niftiinfo(sprintf('%s%s', data_dir, stat_name));
-
-% % change name and
-% tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
-% niftiwrite(single(theta), [data_dir, pa_map_outname], tstat_info_ni);
-
-% tstat_info_ni.Filename = [data_dir, ecc_map_outname, '.nii'];
-% niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
-
-% figure
-% for im_slice = 1:30
-%     subplot(5,6,im_slice)
-%     % imagesc(rot90(squeeze(func_mean(:, im_slice, :)))), axis image, colormap gray
-%     % imagesc(rot90(squeeze(fitted_models.Y(:, im_slice, :)))), axis image
-%     % imagesc(rot90(squeeze(rho(:, im_slice, :)))), axis image, caxis([min(rho(:)), max(rho(:))])
-%     imagesc(rot90(squeeze(theta(:, im_slice, :)))), axis image, caxis([min(theta(:)), max(theta(:))])
-%     % imagesc(rot90(squeeze(mask(:, im_slice, :)))), axis image, colormap gray
-% end
-
-mask(:, 1:20, :) = 1;
-mask(func_mean<-20000) = 0;
-
-% remove global run confounds using glm
-% put the data into a volumes x voxels matrix
-multi_func_ni = permute(multi_func_ni, [4, 1, 2 3]);
-multi_func_ni = reshape(multi_func_ni, size(multi_func_ni,1), []);
-% estimate the voxel run means, make the model, subract it off
-run_counfounds = multi_run_dm \ double(multi_func_ni);
-confound_model = multi_run_dm * run_counfounds;
-resid = double(multi_func_ni) - confound_model;
-% put the data back into it's original 4D shape
-multi_func_ni = reshape(resid, [sum(nvols), map_size]);
-multi_func_ni = permute(multi_func_ni, [2, 3, 4 1]);
-
-%% fit models
-fprintf('fitting pRFs...\n');
-clear fit_pRFs_params
-fit_pRFs_params.mask = mask;
-fitted_models = fit_pRFs(multi_func_ni, combined_models, fit_pRFs_params);
-
-% convert X and Y coords to polar and eccentricity coords
-[theta, rho] = cart2pol(fitted_models.X-retstim2mask_params.resize/2,...
-    fitted_models.Y-retstim2mask_params.resize/2);
-
-% convert theta into degrees (1-180 from upper to lower visual field)
-theta = rad2deg(theta)+180;
-theta = changem(round(theta), [91:180, fliplr(1:180), 1:90], [1:360]);
-
-fprintf('writing nifti maps...\n');
-%% write to nifti
-% load map info as template
-tstat_info_ni = niftiinfo(sprintf('%s%s%s', data_dir, sub, stat_map_name));
-tstat_info_ni.ImageSize = map_size;
-% write polar angle map
-tstat_info_ni.Filename = [data_dir, pa_map_outname, '.nii'];
-niftiwrite(single(theta), [data_dir, pa_map_outname], tstat_info_ni);
-% write eccentricity map
-tstat_info_ni.Filename = [data_dir, ecc_map_outname, '.nii'];
-niftiwrite(single(rho), [data_dir, ecc_map_outname], tstat_info_ni);
-% write prf_size map
-tstat_info_ni.Filename = [data_dir, prf_size_map_outname, '.nii'];
-niftiwrite(single(fitted_models.sigma), [data_dir, prf_size_map_outname], tstat_info_ni);
-% write r_squared map
-tstat_info_ni.Filename = [data_dir, rsq_map_outname, '.nii'];
-niftiwrite(single(fitted_models.r_squared), [data_dir, rsq_map_outname], tstat_info_ni);
