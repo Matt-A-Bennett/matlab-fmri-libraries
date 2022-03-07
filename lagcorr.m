@@ -60,9 +60,9 @@ function [max_lag, max_r] = lagcorr2(timeseries4d, TR, lag_dur, sweep_time, ncyl
     if strcmp(time_res, 'ms')
         models = models(TR:TR:end,:);
     end
+    models = [zeros(1,nlags); models];
     % kludge
-    % models = [zeros(2,nlags); models];
-    models = [models; zeros(142-size(models,1),nlags)];
+    % models = [models; zeros(142-size(models,1),nlags)];
 
     %% compute correlation for each model for each voxel and store highest
     % voxels x lag
