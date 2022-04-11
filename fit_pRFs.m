@@ -45,18 +45,50 @@ function fitted_models = fit_pRFs(functional, models, varargin)
     sigma = nan(map_size);
     r_squared = nan(map_size);
 
+    % keyboard
+
     roi = find(mask(:));
     for idx = 1:length(roi)
         vox = roi(idx);
         [x,y,z] = ind2sub(map_size,vox);
         fits = corr(double(squeeze(functional(x,y,z,:))), models.models);
         [r, i] = max(fits);
+        % if r > 0.03
+        %     break
+        % end
         best_model = models.params(i,:);
         X(vox) = best_model(1);
         Y(vox) = best_model(2);
         sigma(vox) = best_model(3);
         r_squared(vox) = r*r;
     end
+
+    % models.params(1344,:)
+
+    % scatter(models.params(:,1), models.params(:,2), 50, fits, 'filled', 'sq')
+
+    % models.params(1400,:)
+
+    % subplot(1,3,1)
+    % imagesc(reshape(models.models(200, 1:1344), 54, 54))
+    % subplot(1,3,2)
+    % imagesc(reshape(models.models(200, 2917:5832), 54, 54))
+    % subplot(1,3,3)
+    % imagesc(reshape(models.models(200, 5833:8748), 54, 54))
+
+    % thing = reshape(fits(1:2916), 54, 54);
+    % imagesc(thing),
+    % caxis([0, 0.4])
+
+    % size(models.models)
+    % subplot(4,1,1)
+    % plot(double(squeeze(functional(x,y,z,:))))
+    % subplot(4,1,2)
+    % plot(models.models(:,1))
+    % subplot(4,1,3)
+    % plot(models.models(:,3000))
+    % subplot(4,1,4)
+    % plot(models.models(:,8000))
 
     fitted_models.X = X;
     fitted_models.Y = Y;

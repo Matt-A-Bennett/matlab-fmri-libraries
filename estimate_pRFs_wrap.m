@@ -1,9 +1,11 @@
-addpath '/home/mattb/code/matlab/matlab'
-image_dirs = {'~/projects/uclouvain/jolien_proj/exported_pa_ecc/',
-'~/projects/uclouvain/jolien_proj/exported_bars/',
-'~/projects/uclouvain/jolien_proj/exported_bars/'};
+addpath '/home/umutc/Music/scripts/matlab/matlab'
+image_dirs = {'/home/mattb/projects/uclouvain/jolien_proj/exported_pa_ecc/',
+'/home/mattb/projects/uclouvain/jolien_proj/exported_bars/',
+'/home/mattb/projects/uclouvain/jolien_proj/exported_bars/'};
 
-data_dir = '~/projects/uclouvain/jolien_proj/';
+% data_dir = '/home/mattb/projects/uclouvain/jolien_proj/';
+data_dir = '/home/joliens/Documents/02_recurrentSF_3T/data-bids/derivatives/fmriprep/';
+fake_tstat_dir = '/home/joliens/Documents/02_recurrentSF_3T/data-bids/derivatives/analysis-eva/';
 
 out_dir = '/home/umutc/Music/analysis-eva/';
 
@@ -11,15 +13,18 @@ func_names = {'_ses-01_task-paEcc_space-T1w_desc-preproc_bold.nii.gz',
 '_ses-01_task-prfBars_run-1_space-T1w_desc-preproc_bold.nii.gz',
 '_ses-01_task-prfBars_run-2_space-T1w_desc-preproc_bold.nii.gz'};
 
-subs = ['30']
+subs = {'01' '02' '03' '04' '09' '11' '12' '17' '18'}
+subs = {'19', '20', '21', '22'}
 
-% stat_map_name = 'tstat1.nii.gz';
-stat_map_name = '_fake_tstat_map_retino.nii.gz';
+nsubs = length(subs)
 
-pa_map_outname = 'pa_from_pRF_paecc_bars_bars_spatsm_tmp';
-ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_spatsm_tmp';
-prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_spatsm_tmp';
-rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars_spatsm_tmp';
+stat_map_name = 'tstat1.nii.gz';
+% stat_map_name = '_fake_tstat_map_retino.nii.gz';
+
+pa_map_outname = 'pa_from_pRF_paecc_bars_bars_detrend';
+ecc_map_outname = 'ecc_from_pRF_paecc_bars_bars_detrend';
+prf_size_map_outname = 'prf_size_from_pRF_paecc_bars_bars_detrend';
+rsq_map_outname = 'rsq_from_pRF_paecc_bars_bars_detrend';
 
 screen_height_pix = 1080;
 screen_height_cm = 39;
@@ -35,12 +40,15 @@ down_sample_model_space = screen_height_pix/4;
 grid_density = 5;
 % might mix the upper and lower visual fields for V1 (calcerine sulcus)
 do_spatial_smoothing = 1;
+thresh = 0.1
 
 % sigmas in visual degrees to try as models
 % I think we need a logarithmic scaling here...
 % sigmas = [0.05 : 0.05 : 0.8];
 % sigmas = [0.8:0.1:2];
-sigmas = [4, 8, 12];
+% sigmas = [4, 8, 12];
+
+sigmas = [0.05 : 0.3 : 0.65];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
@@ -53,22 +61,23 @@ r_pixperVA = pixperVA/(screen_height_pix/down_sample_model_space);
 sigmas = sigmas * r_pixperVA;
 
 nruns = size(func_names,1);
-multi_func_ni = [];
-combined_models.models = [];
-multi_run_dm = [];
 identity_nruns = eye(nruns);
 nvols = zeros(nruns,1);
 for sub_idx = 1:nsubs
-    sub = subs[sub_idx]
-    sub_data_dir = sprintf('%ssub-%s/', data_dir, sub)
-    sub_out_dir = sprintf('%ssub-%s/', out_dir, sub)
+    multi_func_ni = [];
+    combined_models.models = [];
+    multi_run_dm = [];
+    sub = subs{sub_idx};
+    sub_data_dir = sprintf('%ssub-%s/ses-01/func/', data_dir, sub);
+    sub_out_dir = sprintf('%ssub-%s/', out_dir, sub);
+    fprintf('processing sub %s...\n', sub);
     for run_idx = 1:nruns
         fprintf('processing run %d...\n', run_idx);
         time_step = time_steps(run_idx);
         image_dir = image_dirs{run_idx};
 
         % load functional data and concaternate in along time dimension
-        functional_ni = niftiread(sprintf('%s%s', sub_data_dir, func_names{run_idx}));
+        functional_ni = niftiread(sprintf('%ssub-%s%s', sub_data_dir, sub, func_names{run_idx}));
 
         % spatial smoothing
         if do_spatial_smoothing
@@ -119,14 +128,13 @@ for sub_idx = 1:nsubs
         combined_models.params = models.params;
     end
 
-
-    % % for testing
-    % func_mean = squeeze(mean(functional_ni,4));
-    % map_size = size(functional_ni);
-    % map_size = map_size(1:3);
-    % mask = zeros(map_size);
-    % mask(:, 1:18, :) = 1;
-    % mask(func_mean<-20000) = 0;
+    % for testing
+    func_mean = squeeze(mean(functional_ni,4));
+    map_size = size(functional_ni);
+    map_size = map_size(1:3);
+    mask = zeros(map_size);
+    mask(:, 1:18, :) = 1;
+    mask(func_mean<-20000) = 0;
 
     % fit_pRFs_params.mask = mask;
     % fitted_models = fit_pRFs(functional_ni, models, fit_pRFs_params)
@@ -155,8 +163,8 @@ for sub_idx = 1:nsubs
     %     % imagesc(rot90(squeeze(mask(:, im_slice, :)))), axis image, colormap gray
     % end
 
-    mask(:, 1:20, :) = 1;
-    mask(func_mean<-20000) = 0;
+    % mask(:, 1:20, :) = 1;
+    % mask(func_mean<-20000) = 0;
 
     % remove global run confounds using glm
     % put the data into a volumes x voxels matrix
@@ -166,6 +174,19 @@ for sub_idx = 1:nsubs
     run_counfounds = multi_run_dm \ double(multi_func_ni);
     confound_model = multi_run_dm * run_counfounds;
     resid = double(multi_func_ni) - confound_model;
+
+    % remove slow drifts
+    % assuming 16 mins of functional data, to get 8th degree polynomial:
+    % Kay, K., Rokem, A., Winawer, J., Dougherty, R., & Wandell, B. (2013).
+    % GLMdenoise: a fast, automated technique for denoising task-based fMRI
+    % data. Frontiers in neuroscience, 247.
+
+    % "The number of polynomial regressors included in The model is set by a
+    % simple heuristic: for each run, we include polynomials of degrees 0
+    % through round(L/2) where L is the duration in minutes outputf the run
+    % (thus, higher degree polynomials are used for longer runs)."
+    resid = detrend(resid, 8);
+
     % put the data back into it's original 4D shape
     multi_func_ni = reshape(resid, [sum(nvols), map_size]);
     multi_func_ni = permute(multi_func_ni, [2, 3, 4 1]);
@@ -184,21 +205,32 @@ for sub_idx = 1:nsubs
     theta = rad2deg(theta)+180;
     theta = changem(round(theta), [91:180, fliplr(1:180), 1:90], [1:360]);
 
-    fprintf('writing nifti maps...\n');
-    %% write to nifti
-    % load map info as template
-    tstat_info_ni = niftiinfo(sprintf('%ssub-%s%s', out_dir, sub, stat_map_name));
-    tstat_info_ni.ImageSize = map_size;
-    % write polar angle map
-    tstat_info_ni.Filename = [out_dir, pa_map_outname, '.nii'];
-    niftiwrite(single(theta), [out_dir, pa_map_outname], tstat_info_ni);
-    % write eccentricity map
-    tstat_info_ni.Filename = [out_dir, ecc_map_outname, '.nii'];
-    niftiwrite(single(rho), [out_dir, ecc_map_outname], tstat_info_ni);
-    % write prf_size map
-    tstat_info_ni.Filename = [out_dir, prf_size_map_outname, '.nii'];
-    niftiwrite(single(fitted_models.sigma), [out_dir, prf_size_map_outname], tstat_info_ni);
-    % write r_squared map
-    tstat_info_ni.Filename = [out_dir, rsq_map_outname, '.nii'];
-    niftiwrite(single(fitted_models.r_squared), [out_dir, rsq_map_outname], tstat_info_ni);
+    fprintf('writing nifti maps...\n\n');
+    for i = 1:2
+        if i == 1
+            thresh_name = '';
+        else
+            thresh_name = ['_', num2str(thresh)];
+            % threshold maps
+            theta(fitted_models.r_squared<thresh) = NaN;
+            rho(fitted_models.r_squared<thresh) = NaN;
+            fitted_models.sigma(fitted_models.sigma<thresh) = NaN;
+        end
+        %% write to nifti
+        % load map info as template
+        tstat_info_ni = niftiinfo(sprintf('%ssub-%s/fake_stat_map.feat/stats/%s', fake_tstat_dir, sub, stat_map_name));
+        tstat_info_ni.ImageSize = map_size;
+        % write polar angle map
+        tstat_info_ni.Filename = [out_dir, 'sub-', sub, '/SUMA/', pa_map_outname, '_thr', thresh_name, '.nii'];
+        niftiwrite(single(theta), [out_dir, 'sub-', sub, '/SUMA/', pa_map_outname, '_thr', thresh_name, '.nii'], tstat_info_ni);
+        % write eccentricity map
+        tstat_info_ni.Filename = [out_dir, 'sub-', sub, '/SUMA/', ecc_map_outname, '_thr', thresh_name, '.nii'];
+        niftiwrite(single(rho), [out_dir, 'sub-', sub, '/SUMA/', ecc_map_outname, '_thr', thresh_name, '.nii'], tstat_info_ni);
+        % write prf_size map
+        tstat_info_ni.Filename = [out_dir, 'sub-', sub, '/SUMA/', prf_size_map_outname, '_thr', thresh_name, '.nii'];
+        niftiwrite(single(fitted_models.sigma), [out_dir, 'sub-', sub, '/SUMA/', prf_size_map_outname, '_thr', thresh_name, '.nii'], tstat_info_ni);
+        % write r_squared map
+        tstat_info_ni.Filename = [out_dir, 'sub-', sub, '/SUMA/', rsq_map_outname, '_thr', thresh_name, '.nii'];
+        niftiwrite(single(fitted_models.r_squared), [out_dir, 'sub-', sub, '/SUMA/', rsq_map_outname, '_thr', thresh_name, '.nii'], tstat_info_ni);
+    end
 end

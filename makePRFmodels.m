@@ -81,6 +81,7 @@ function models = makePRFmodels(stimMasks, grid_density, sigmas, varargin)
             end
         end
     end
+
     % remove out-of-roi models
     gaussians(max(isnan(gaussians),[],2),:) = [];
     model_params(max(isnan(model_params),[],2),:) = [];

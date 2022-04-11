@@ -44,6 +44,17 @@ function [max_lag, max_r] = lagcorr2(timeseries4d, TR, lag_dur, sweep_time, ncyl
     % make a nvols x nvox matrix
     timeseries4d = reshape(timeseries4d, nvols, []);
 
+    % remove slow drifts
+    % Kay, K., Rokem, A., Winawer, J., Dougherty, R., & Wandell, B. (2013).
+    % GLMdenoise: a fast, automated technique for denoising task-based fMRI
+    % data. Frontiers in neuroscience, 247.
+
+    % "The number of polynomial regressors included in The model is set by a
+    % simple heuristic: for each run, we include polynomials of degrees 0
+    % through round(L/2) where L is the duration in minutes outputf the run
+    degree = round((((size(timeseries4d,1)*TR)/1000)/60)/2);
+    timeseries4d = detrend(double(timeseries4d), degree);
+
     %% create HRF models (one for each lag)
     event_list = ones(ncylces,1);
     extra_params.BlockLength = stim_length;
