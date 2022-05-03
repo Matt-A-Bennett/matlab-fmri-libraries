@@ -47,6 +47,7 @@ fixed and I can just write the rest of function assuming their existence:
 %% set default values for optional variables
 my_first_variable = 1;
 my_second_variable = 2;
+my_thrid_variable = 3; % new line added to the code example!
 
 %% override optional arguments
 % if varagin variables have been provided, overwrite the above default
@@ -69,3 +70,4 @@ if ~isempty(varargin)
     end
 end
 ```
+
