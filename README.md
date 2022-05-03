@@ -1,4 +1,10 @@
-# Matlab (mainly functions)
+# Matlab_fmri_functions and wrappers
+
+This repository contains various functions that are interdependent and which
+are useful when doing some types of fmri analyses. In particular,
+estimate_pRFs_wrap.m can be used for the data collected with my
+[pyschopy-retinotopy](https://github.com/Matt-A-Bennett/psychopy-retinotopy)
+repository.
 
 All of my functions follow a particular style when it comes to handling
 optional input arguments (varargins). I got annoyed with the common approach
