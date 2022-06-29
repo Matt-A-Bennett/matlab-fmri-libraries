@@ -34,7 +34,7 @@ screen_distance_cm = 200;
 % if we pretend the screen was lower resolution, all the computations are less
 % expensive and we don't lose much precision (it's no as if we can reliably
 % estimate the pRF location down to the pixel level)
-down_sample_model_space = screen_height_pix/4;
+down_sample_model_space_factor = 4;
 
 % number of pixels (in downsized space) bewteen neighbouring pRF models
 grid_density = 5;
@@ -43,12 +43,8 @@ do_spatial_smoothing = 1;
 thresh = 0.1
 
 % sigmas in visual degrees to try as models
-% I think we need a logarithmic scaling here...
-% sigmas = [0.05 : 0.05 : 0.8];
-% sigmas = [0.8:0.1:2];
-% sigmas = [4, 8, 12];
-
-sigmas = [0.05 : 0.3 : 0.65];
+% I think a logarithmic scaling could be better here...
+sigmas = [0.05 : 0.3 : 1];
 
 % specifc to pa-ecc run and the 2 bar runs
 time_steps = [1000/(((6*42667)-450)/842),...
@@ -57,8 +53,7 @@ time_steps = [1000/(((6*42667)-450)/842),...
 
 %% start
 pixperVA = pixperVisAng(screen_height_pix, screen_height_cm, screen_distance_cm);
-r_pixperVA = pixperVA/(screen_height_pix/down_sample_model_space);
-sigmas = sigmas * r_pixperVA;
+sigmas = (sigmas * pixperVA)/down_sample_model_space_factor;
 
 nruns = size(func_names,1);
 identity_nruns = eye(nruns);
@@ -103,7 +98,7 @@ for sub_idx = 1:nsubs
 
         % convert the .png screenshots to a 3D binary mask matrix
         clear retstim2mask_params
-        retstim2mask_params.resize = down_sample_model_space;
+        retstim2mask_params.resize = screen_height_pix/down_sample_model_space_factor;
         stimMasks = retstim2mask(image_dir, retstim2mask_params);
 
         % create model timecourse and pad to make the baseline
